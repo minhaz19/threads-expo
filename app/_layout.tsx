@@ -1,39 +1,87 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
+import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/clerk-expo'
+import { Link, Slot, Stack, usePathname, useRouter, useSegments } from 'expo-router'
+import "../global.css";
+import {
+  useFonts,
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_700Bold,
+} from '@expo-google-fonts/dm-sans';
+import { tokenCache } from '@/utils/cache';
+import { secureStore } from '@clerk/clerk-expo/secure-store'
 import { useEffect } from 'react';
-import 'react-native-reanimated';
+import * as SplashScreen from 'expo-splash-screen'
+import { Colors } from 'react-native/Libraries/NewAppScreen';
+import { SignedIn, SignedOut, useClerk, useUser } from '@clerk/clerk-expo'
+import { ActivityIndicator, StatusBar, Text, View } from 'react-native';
+import AuthenticateLayout from './(auth)/(tabs)/_layout';
+import PublicLayout from './(public)/_layout';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+const publishableKey = 'pk_test_aG9uZXN0LXJlaW5kZWVyLTg5LmNsZXJrLmFjY291bnRzLmRldiQ'
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+if (!publishableKey) {
+  throw new Error(
+    'Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env',
+  )
+}
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+//prevent auto hide splash screen
+SplashScreen.preventAutoHideAsync()
+
+const InitialLayout = () => {
+  const router = useRouter();
+  const { isLoaded, isSignedIn } = useAuth();
+  const segments = useSegments();
+
+  const [fontsLoaded] = useFonts({
+    DMSans_400Regular, DMSans_500Medium, DMSans_700Bold
+  })
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    if (fontsLoaded) {
+      SplashScreen.hideAsync()
     }
-  }, [loaded]);
+  }, [fontsLoaded])
 
-  if (!loaded) {
-    return null;
+  useEffect(() => {
+    if (!isLoaded) return;
+    const inTabsGroup = segments[0] === '(auth)';
+
+    if (isSignedIn && !inTabsGroup) {
+      console.log(isSignedIn, inTabsGroup, segments, '/(auth)/(tabs)/feed')
+      router.replace('/(auth)/(tabs)/feed');
+    } else if (!isSignedIn && inTabsGroup) {
+      console.log(isSignedIn, inTabsGroup, segments, '/(public)')
+      router.replace('/(public)');
+    }
+  }, [isSignedIn]);
+
+  if (!isLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+    <Slot />
+  )
 }
+
+const RootLayoutNav = () => {
+  return (
+    <ClerkProvider
+      publishableKey={publishableKey}
+      tokenCache={tokenCache}
+      __experimental_resourceCache={secureStore}
+    >
+      <ClerkLoaded>
+        <InitialLayout />
+      </ClerkLoaded>
+    </ClerkProvider>
+  );
+};
+
+export default RootLayoutNav;
