@@ -1,10 +1,15 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { Button, StyleSheet, Text, View } from 'react-native'
 import React from 'react'
+import { useAuth } from '@clerk/clerk-expo';
 
 const ProfileScreen = () => {
+    const { signOut } = useAuth();
+    const logout = () => {
+        signOut();
+    }
     return (
         <View>
-            <Text>Profile</Text>
+            <Button onPress={logout} title="Logout" />
         </View>
     )
 }

@@ -2,15 +2,16 @@ import { Colors } from '@/constants/Colors';
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSSO } from '@clerk/clerk-expo';
+import { useOAuth } from '@clerk/clerk-expo';
 import { Link } from 'expo-router';
 
 const LoginScreen = () => {
-  const { startSSOFlow } = useSSO();
+  const { startOAuthFlow: facebookLogin } = useOAuth({ strategy: 'oauth_facebook' });
+  const { startOAuthFlow: googleLogin } = useOAuth({ strategy: 'oauth_google' });
 
   const handleFacebookLogin = async () => {
     try {
-      const { createdSessionId, setActive } = await startSSOFlow({ strategy: 'oauth_facebook' });
+      const { createdSessionId, setActive } = await facebookLogin();
 
       if (createdSessionId) {
         setActive!({ session: createdSessionId });
@@ -22,7 +23,8 @@ const LoginScreen = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      const { createdSessionId, setActive } = await startSSOFlow({ strategy: 'oauth_google' });
+      const { createdSessionId, setActive } = await googleLogin();
+
 
       if (createdSessionId) {
         setActive!({ session: createdSessionId });

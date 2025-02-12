@@ -1,5 +1,5 @@
 import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/clerk-expo'
-import { Link, Slot, Stack, usePathname, useRouter, useSegments } from 'expo-router'
+import { Slot, useRouter, useSegments } from 'expo-router'
 import "../global.css";
 import {
   useFonts,
@@ -12,11 +12,8 @@ import { secureStore } from '@clerk/clerk-expo/secure-store'
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen'
 import { Colors } from 'react-native/Libraries/NewAppScreen';
-import { SignedIn, SignedOut, useClerk, useUser } from '@clerk/clerk-expo'
-import { ActivityIndicator, StatusBar, Text, View } from 'react-native';
-import AuthenticateLayout from './(auth)/(tabs)/_layout';
-import PublicLayout from './(public)/_layout';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, StatusBar, View } from 'react-native';
+import Toast from 'react-native-toast-message'
 
 const publishableKey = 'pk_test_aG9uZXN0LXJlaW5kZWVyLTg5LmNsZXJrLmFjY291bnRzLmRldiQ'
 
@@ -33,6 +30,7 @@ const InitialLayout = () => {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useAuth();
   const segments = useSegments();
+ 
 
   const [fontsLoaded] = useFonts({
     DMSans_400Regular, DMSans_500Medium, DMSans_700Bold
@@ -47,12 +45,9 @@ const InitialLayout = () => {
   useEffect(() => {
     if (!isLoaded) return;
     const inTabsGroup = segments[0] === '(auth)';
-
     if (isSignedIn && !inTabsGroup) {
-      console.log(isSignedIn, inTabsGroup, segments, '/(auth)/(tabs)/feed')
       router.replace('/(auth)/(tabs)/feed');
     } else if (!isSignedIn && inTabsGroup) {
-      console.log(isSignedIn, inTabsGroup, segments, '/(public)')
       router.replace('/(public)');
     }
   }, [isSignedIn]);
@@ -80,6 +75,13 @@ const RootLayoutNav = () => {
       <ClerkLoaded>
         <InitialLayout />
       </ClerkLoaded>
+      <Toast />
+      <StatusBar
+        animated={true}
+        barStyle="dark-content"
+        showHideTransition="slide"
+        hidden={false}
+      />
     </ClerkProvider>
   );
 };

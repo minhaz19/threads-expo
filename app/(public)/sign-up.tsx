@@ -1,101 +1,296 @@
 import * as React from 'react'
-import { Text, TextInput, Button, View } from 'react-native'
+import { Text, TextInput, View, StyleSheet, Pressable, ActivityIndicator } from 'react-native'
 import { useSignUp } from '@clerk/clerk-expo'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useForm, Controller } from 'react-hook-form'
+import { Link } from 'expo-router'
+import { Colors } from '@/constants/Colors'
+
+type SignUpFormData = {
+    email: string
+    password: string
+}
 
 export default function SignUpScreen() {
     const { isLoaded, signUp, setActive } = useSignUp()
     const router = useRouter()
-
-    const [emailAddress, setEmailAddress] = React.useState('')
-    const [password, setPassword] = React.useState('')
     const [pendingVerification, setPendingVerification] = React.useState(false)
-    const [code, setCode] = React.useState('')
+    const [isSignUpLoading, setIsSignUpLoading] = React.useState(false)
+    const [isVerifyLoading, setIsVerifyLoading] = React.useState(false)
+    const [verificationCode, setVerificationCode] = React.useState('')
 
-    // Handle submission of sign-up form
-    const onSignUpPress = async () => {
+    const { control: signUpControl, handleSubmit: handleSignUpSubmit, formState: { errors: signUpErrors } } =
+        useForm<SignUpFormData>({
+            defaultValues: {
+                email: '',
+                password: ''
+            }
+        })
+
+    const onSignUpPress = async (data: SignUpFormData) => {
         if (!isLoaded) return
+        setIsSignUpLoading(true)
 
-        // Start sign-up process using email and password provided
         try {
             await signUp.create({
-                emailAddress,
-                password,
+                emailAddress: data.email,
+                password: data.password,
             })
 
-            // Send user an email with verification code
             await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
-
-            // Set 'pendingVerification' to true to display second form
-            // and capture OTP code
             setPendingVerification(true)
         } catch (err) {
-            // See https://clerk.com/docs/custom-flows/error-handling
-            // for more info on error handling
             console.log(JSON.stringify(err, null, 2))
+        } finally {
+            setIsSignUpLoading(false)
         }
     }
 
-    // Handle submission of verification form
     const onVerifyPress = async () => {
         if (!isLoaded) return
+        setIsVerifyLoading(true)
 
         try {
-            // Use the code the user provided to attempt verification
             const signUpAttempt = await signUp.attemptEmailAddressVerification({
-                code,
+                code: verificationCode,
             })
 
-            // If verification was completed, set the session to active
-            // and redirect the user
             if (signUpAttempt.status === 'complete') {
                 await setActive({ session: signUpAttempt.createdSessionId })
                 router.replace('/')
             } else {
-                // If the status is not complete, check why. User may need to
-                // complete further steps.
                 console.error(JSON.stringify(signUpAttempt, null, 2))
             }
         } catch (err) {
-            // See https://clerk.com/docs/custom-flows/error-handling
-            // for more info on error handling
             console.error(JSON.stringify(err, null, 2))
+        } finally {
+            setIsVerifyLoading(false)
         }
     }
 
     if (pendingVerification) {
         return (
-            <>
-                <Text>Verify your email</Text>
-                <TextInput
-                    value={code}
-                    placeholder="Enter your verification code"
-                    onChangeText={(code) => setCode(code)}
-                />
-                <Button title="Verify" onPress={onVerifyPress} />
-            </>
+            <SafeAreaView style={styles.container}>
+                <View style={styles.formContainer}>
+                    <Text style={styles.title}>Verify your email</Text>
+
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            value={verificationCode}
+                            placeholder="Enter verification code"
+                            onChangeText={(text) => {
+                                // Only allow numeric input
+                                const numericValue = text.replace(/[^0-9]/g, '')
+                                setVerificationCode(numericValue)
+                            }}
+                            style={styles.input}
+                            placeholderTextColor="#666"
+                            keyboardType="numeric"
+                            maxLength={6}
+                            autoFocus={true}
+                        />
+                    </View>
+
+                    <View style={styles.buttonContainer}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.button,
+                                pressed && styles.buttonPressed,
+                                isVerifyLoading && styles.buttonDisabled
+                            ]}
+                            onPress={onVerifyPress}
+                            disabled={isVerifyLoading}
+                        >
+                            {isVerifyLoading ? (
+                                <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.buttonText}>Verify Email</Text>
+                            )}
+                        </Pressable>
+                    </View>
+                </View>
+            </SafeAreaView>
         )
     }
 
     return (
-        <SafeAreaView>
-            <>
-                <Text>Sign up</Text>
-                <TextInput
-                    autoCapitalize="none"
-                    value={emailAddress}
-                    placeholder="Enter email"
-                    onChangeText={(email) => setEmailAddress(email)}
+        <SafeAreaView style={styles.container}>
+            <View style={styles.formContainer}>
+                <Text style={styles.title}>Create Account</Text>
+
+                <Controller
+                    control={signUpControl}
+                    rules={{
+                        required: 'Email is required',
+                        pattern: {
+                            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                            message: 'Invalid email address'
+                        }
+                    }}
+                    name="email"
+                    render={({ field: { onChange, value } }) => (
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                autoCapitalize="none"
+                                value={value}
+                                placeholder="Enter email"
+                                onChangeText={onChange}
+                                style={[styles.input, signUpErrors.email && styles.inputError]}
+                                placeholderTextColor="#666"
+                                keyboardType="email-address"
+                            />
+                            {signUpErrors.email && (
+                                <Text style={styles.errorText}>{signUpErrors.email.message}</Text>
+                            )}
+                        </View>
+                    )}
                 />
-                <TextInput
-                    value={password}
-                    placeholder="Enter password"
-                    secureTextEntry={true}
-                    onChangeText={(password) => setPassword(password)}
+
+                <Controller
+                    control={signUpControl}
+                    rules={{
+                        required: 'Password is required',
+                        minLength: {
+                            value: 8,
+                            message: 'Password must be at least 8 characters'
+                        },
+                        pattern: {
+                            value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+                            message: 'Password must contain uppercase, lowercase, number and special character'
+                        }
+                    }}
+                    name="password"
+                    render={({ field: { onChange, value } }) => (
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                value={value}
+                                placeholder="Enter password"
+                                secureTextEntry={true}
+                                onChangeText={onChange}
+                                style={[styles.input, signUpErrors.password && styles.inputError]}
+                                placeholderTextColor="#666"
+                            />
+                            {signUpErrors.password && (
+                                <Text style={styles.errorText}>{signUpErrors.password.message}</Text>
+                            )}
+                        </View>
+                    )}
                 />
-                <Button title="Continue" onPress={onSignUpPress} />
-            </>
+
+                <View style={styles.buttonContainer}>
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.button,
+                            pressed && styles.buttonPressed,
+                            (isSignUpLoading) && styles.buttonDisabled
+                        ]}
+                        onPress={handleSignUpSubmit(onSignUpPress)}
+                        disabled={isSignUpLoading}
+                    >
+                        {isSignUpLoading ? (
+                            <ActivityIndicator color="#FFFFFF" />
+                        ) : (
+                            <Text style={styles.buttonText}>Sign up</Text>
+                        )}
+                    </Pressable>
+                </View>
+
+                <View style={styles.footer}>
+                    <Text style={styles.footerText}>Already have an account? </Text>
+                    <Link href="/sign-in" asChild>
+                        <Pressable>
+                            <Text style={styles.link}>Sign in</Text>
+                        </Pressable>
+                    </Link>
+                </View>
+            </View>
         </SafeAreaView>
     )
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
+    formContainer: {
+        padding: 24,
+        flex: 1,
+        justifyContent: 'center',
+        maxWidth: 500,
+        width: '100%',
+        alignSelf: 'center',
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#000',
+        marginBottom: 24,
+        textAlign: 'center',
+    },
+    inputContainer: {
+        marginBottom: 16,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        padding: 16,
+        borderRadius: 8,
+        fontSize: 16,
+        backgroundColor: '#f8f8f8',
+        color: '#000',
+    },
+    inputError: {
+        borderColor: '#ff0000',
+    },
+    errorText: {
+        color: '#ff0000',
+        fontSize: 12,
+        marginTop: 4,
+        marginLeft: 4,
+    },
+    buttonContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: 50,
+        borderRadius: 8,
+        backgroundColor: '#007AFF',
+        overflow: 'hidden',
+    },
+    button: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    buttonPressed: {
+        opacity: 0.8,
+    },
+    buttonDisabled: {
+        opacity: 0.5,
+    },
+    buttonText: {
+        color: '#FFFFFF',
+        textAlign: 'center',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 24,
+        alignItems: 'center',
+    },
+    footerText: {
+        color: '#666',
+        fontSize: 14,
+    },
+    link: {
+        color: '#000',
+        fontSize: 14,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
+    },
+})
