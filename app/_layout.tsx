@@ -13,9 +13,14 @@ import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen'
 import { Colors } from 'react-native/Libraries/NewAppScreen';
 import { ActivityIndicator, StatusBar, View } from 'react-native';
-import Toast from 'react-native-toast-message'
+import { ConvexProvider, ConvexReactClient } from "convex/react";
+import Toast from 'react-native-toast-message';
 
 const publishableKey = 'pk_test_aG9uZXN0LXJlaW5kZWVyLTg5LmNsZXJrLmFjY291bnRzLmRldiQ'
+
+const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
+  unsavedChangesWarning: false,
+});
 
 if (!publishableKey) {
   throw new Error(
@@ -30,7 +35,7 @@ const InitialLayout = () => {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useAuth();
   const segments = useSegments();
- 
+
 
   const [fontsLoaded] = useFonts({
     DMSans_400Regular, DMSans_500Medium, DMSans_700Bold
@@ -67,13 +72,16 @@ const InitialLayout = () => {
 
 const RootLayoutNav = () => {
   return (
+
     <ClerkProvider
       publishableKey={publishableKey}
       tokenCache={tokenCache}
       __experimental_resourceCache={secureStore}
     >
       <ClerkLoaded>
-        <InitialLayout />
+        <ConvexProvider client={convex}>
+          <InitialLayout />
+        </ConvexProvider>
       </ClerkLoaded>
       <Toast />
       <StatusBar
@@ -83,6 +91,7 @@ const RootLayoutNav = () => {
         hidden={false}
       />
     </ClerkProvider>
+
   );
 };
 
